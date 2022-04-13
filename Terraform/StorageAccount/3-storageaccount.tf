@@ -1,4 +1,4 @@
-## INSERER ICI LE CODE POUR FAIRE : 
+## ICI le code décrit la création d'un compte de stockage contenant un container : 
 #      --- UN STORAGE ACCOUNT AZURE de type GPv2
 #      --- AVEC UN CONTAINER NOMME tfstate et le TLS activé pour les échanges réseaux
 
