@@ -1,0 +1,93 @@
+name: Workflow CI Application
+
+on:
+  workflow_dispatch:
+
+env: # variables 
+  REGISTRY_NAME: "acrpierrc007"
+  APP_NAME: "coolapi"
+  IMAGE_VERSION: "1.0.0"
+
+jobs: # 3 jobs qui s'enchaînent à la suite : 1 analyze-code - 2 test-unitaire - 3 build-scan-push
+
+  analyze-code: # You can use CodeQL to identify vulnerabilities and errors in your code. The results are shown as code scanning alerts in GitHub https://docs.github.com/en/code-security/code-scanning/automatically-scanning-your-code-for-vulnerabilities-and-errors/about-code-scanning-with-codeql
+    runs-on: ubuntu-latest
+    permissions: # https://docs.github.com/en/actions/using-jobs/assigning-permissions-to-jobs
+      actions: read # only required for workflows in private repositories https://github.com/github/codeql-action
+      contents: read # only required for workflows in private repositories https://github.com/github/codeql-action
+      security-events: write # required for all workflows https://github.com/github/codeql-action
+
+    strategy:
+      fail-fast: false # s'arrête s'il a une erreur dans la definition de la matrice
+      matrix: # https://docs.github.com/en/actions/using-jobs/using-a-build-matrix-for-your-jobs
+        language: [ 'javascript' ]
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v1 # https://github.com/github/codeql-action
+      with:
+        languages: ${{ matrix.language }} # https://docs.github.com/en/actions/using-jobs/using-a-build-matrix-for-your-jobs
+
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v1 # https://github.com/github/codeql-action
+
+  test-unitaire: # Deuxieme job "tests unitaires"
+    runs-on: ubuntu-latest 
+    needs: analyze-code # Declenchement du Job "test-unitaire" si le job "analyze-code" s"execute sans erreur 
+    strategy:
+      matrix:
+        node-version: [10.x, 12.x, 14.x, 15.x] # Matrice des versions Nodejs pour le test unitaire
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v2
+
+      - name: Use Node.js
+        uses: actions/setup-node@v1 # https://github.com/actions/setup-node
+        with:
+          node-version: ${{ matrix.node-version }} # application de la matrice
+
+      - name: Installation des dependences
+        run : |
+          cd API && npm install
+
+      - name: Tests unitaires
+        run: |
+          cd API && npm test
+
+  build-scan-push:
+    runs-on: ubuntu-latest 
+    needs: test-unitaire # Declenchement du Job "build-scan-push" si le job "test unitaire" s"execute sans erreur 
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v2
+
+      - name: Build de l'image de l'application
+        run: |
+          cd API && docker build . -t ${{ env.REGISTRY_NAME}}.azurecr.io/${{ env.APP_NAME }}:${{ env.IMAGE_VERSION }}
+
+      - name: Scan Image
+        uses: Azure/container-scan@v0 
+        id: container-scan
+        continue-on-error: true
+        with:
+          image-name: ${{ env.REGISTRY_NAME}}.azurecr.io/${{ env.APP_NAME }}:${{ env.IMAGE_VERSION }}         
+
+      - name: Login Azure Container Registry
+        run: |
+          docker login ${{ env.REGISTRY_NAME}}.azurecr.io --username ${{ secrets.CLIENTID}} --password ${{ secrets.CLIENTSECRET }}
+
+      - name: Push de l'image de l'application
+        run: |
+          cd API && docker push ${{ env.REGISTRY_NAME}}.azurecr.io/${{ env.APP_NAME }}:${{ env.IMAGE_VERSION }}
+
+
+        
+
+
+          
+
