@@ -26,6 +26,8 @@ variable "AzureClientID" {
   type = string
 }
 
+
+
 variable "AzureTenandID" {
   type = string
 }
